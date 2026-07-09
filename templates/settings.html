@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="stats-grid">
+  <article class="stat-card">
+    <span>当前账号</span>
+    <strong id="settingUsername">-</strong>
+  </article>
+  <article class="stat-card">
+    <span>人员数量</span>
+    <strong id="settingPersonCount">0</strong>
+  </article>
+  <article class="stat-card">
+    <span>记录数量</span>
+    <strong id="settingRecordCount">0</strong>
+  </article>
+  <article class="stat-card">
+    <span>数据目录</span>
+    <strong>data</strong>
+  </article>
+</div>
+
+<section class="panel">
+  <div class="panel-header">
+    <h2>数据文件状态</h2>
+    <button class="small-button" id="refreshSettings">刷新</button>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>文件</th>
+          <th>路径</th>
+          <th>是否存在</th>
+          <th>大小</th>
+        </tr>
+      </thead>
+      <tbody id="settingsRows"></tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>initSettingsPage();</script>
+{% endblock %}

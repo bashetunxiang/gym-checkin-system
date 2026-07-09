@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="stats-grid">
+  <article class="stat-card">
+    <span>今日到馆人数</span>
+    <strong id="todayEnterCount">0</strong>
+  </article>
+  <article class="stat-card">
+    <span>当前在馆人数</span>
+    <strong id="insideCount">0</strong>
+  </article>
+  <article class="stat-card">
+    <span>今日离馆人数</span>
+    <strong id="todayLeaveCount">0</strong>
+  </article>
+  <article class="stat-card">
+    <span>平均停留时间</span>
+    <strong id="averageStayText">0秒</strong>
+  </article>
+</div>
+
+<div class="two-column">
+  <section class="panel">
+    <div class="panel-header">
+      <h2>近 7 日到馆趋势</h2>
+    </div>
+    <div id="dailyChart" class="chart"></div>
+  </section>
+  <section class="panel">
+    <div class="panel-header">
+      <h2>当前在馆人员</h2>
+      <a href="{{ url_for('inside_page') }}">查看全部</a>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>第几个进入场馆</th>
+            <th>人员编号</th>
+            <th>姓名</th>
+            <th>进入时间</th>
+          </tr>
+        </thead>
+        <tbody id="dashboardInsideRows"></tbody>
+      </table>
+    </div>
+  </section>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>initDashboardPage();</script>
+{% endblock %}

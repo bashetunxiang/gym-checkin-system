@@ -1,59 +1,50 @@
-import random
-import datetime
-from entity import organizations as o
-def randomNumber(len):
-    first = str(random.randint(1, 9))
-    last = "".join(random.sample('1234567890', len - 1))
-    return first + last
-def randomCode():
-    return randomNumber(o.CODE_LEN)
-def valid_time(str):
-    try:
-        datetime.datetime.strptime(str, '%H:%M')
-        return True
-    except ValueError:
-        return False
-def valid_year_month(str):
-    try:
-        datetime.datetime.strptime(str, '%Y-%m')
-        return True
-    except ValueError:
-        return False
-def valid_date(date):
-    try:
-        datetime.datetime.strptime(date, '%Y-%m-%d')
-        return True
-    except ValueError:
-        return False
-
-
-
-
+from __future__ import annotations
 
 import os
-from entity import organizations as o
+from datetime import datetime
+from pathlib import Path
+from typing import Optional
 
 
-def remove_pics(id):
-    """
-    删除指定员工的所有人脸图片
-    """
-    # 员工照片文件夹
-    pic_path = os.getcwd() + "\\data\\faces\\"
+DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 
-    if not os.path.exists(pic_path):
-        return
 
-    code = None
+def ensure_directory(path: str | Path) -> None:
+    target = Path(path)
+    directory = target if target.suffix == "" else target.parent
+    if directory:
+        os.makedirs(directory, exist_ok=True)
 
-    for emp in o.EMPLOYEES:
-        if str(emp.id) == str(id):
-            code = str(emp.code)
-            break
 
-    if code is None:
-        return
+def now_text() -> str:
+    return datetime.now().strftime(DATETIME_FORMAT)
 
-    for file_name in os.listdir(pic_path):
-        if file_name.startswith(code):
-            os.remove(pic_path + file_name)
+
+def parse_datetime(value: str) -> datetime:
+    return datetime.strptime(value, DATETIME_FORMAT)
+
+
+def format_duration(seconds: Optional[int]) -> str:
+    if seconds is None:
+        return "未离馆"
+    seconds = max(0, int(seconds))
+    hours, remainder = divmod(seconds, 3600)
+    minutes, secs = divmod(remainder, 60)
+    if hours:
+        return f"{hours}小时{minutes}分钟{secs}秒"
+    if minutes:
+        return f"{minutes}分钟{secs}秒"
+    return f"{secs}秒"
+
+
+def prompt_required(label: str) -> str:
+    while True:
+        value = input(f"{label}: ").strip()
+        if value:
+            return value
+        print(f"{label}不能为空。")
+
+
+def prompt_optional(label: str, default: str = "") -> str:
+    value = input(f"{label}: ").strip()
+    return value or default

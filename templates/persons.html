@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="two-column">
+  <section class="panel">
+    <div class="panel-header">
+      <h2>添加或更新人员</h2>
+    </div>
+    <form id="personForm" class="form-grid">
+      <label>
+        <span>人员编号</span>
+        <input name="person_id" required>
+      </label>
+      <label>
+        <span>姓名</span>
+        <input name="name" required>
+      </label>
+      <label>
+        <span>联系电话</span>
+        <input name="phone">
+      </label>
+      <label>
+        <span>备注</span>
+        <input name="remark">
+      </label>
+      <button type="submit">保存人员</button>
+    </form>
+  </section>
+  <section class="panel">
+    <div class="panel-header">
+      <h2>人员列表</h2>
+      <button class="small-button" id="refreshPersons">刷新</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>人员编号</th>
+            <th>姓名</th>
+            <th>联系电话</th>
+            <th>备注</th>
+          </tr>
+        </thead>
+        <tbody id="personRows"></tbody>
+      </table>
+    </div>
+  </section>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>initPersonsPage();</script>
+{% endblock %}

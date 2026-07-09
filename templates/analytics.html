@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="two-column">
+  <section class="panel">
+    <div class="panel-header">
+      <h2>近 7 日到馆次数</h2>
+    </div>
+    <div id="analyticsDailyChart" class="chart"></div>
+  </section>
+  <section class="panel">
+    <div class="panel-header">
+      <h2>本月人员在馆时长</h2>
+      <span id="monthlyTotal" class="status-pill">累计 0秒</span>
+    </div>
+    <div id="analyticsMonthlyChart" class="chart"></div>
+  </section>
+</div>
+
+<section class="panel">
+  <div class="panel-header">
+    <h2>本月明细</h2>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>人员编号</th>
+          <th>姓名</th>
+          <th>到馆次数</th>
+          <th>在馆时长</th>
+        </tr>
+      </thead>
+      <tbody id="monthlyRows"></tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>initAnalyticsPage();</script>
+{% endblock %}

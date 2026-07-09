@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title }} - 体育馆视频打卡管理系统</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v=4">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">G</div>
+        <div>
+          <div class="brand-title">Gym Check</div>
+          <div class="brand-subtitle">Video Access</div>
+        </div>
+      </div>
+      <nav class="nav">
+        <a class="{{ 'active' if active == 'dashboard' else '' }}" href="{{ url_for('dashboard_page') }}">首页 Dashboard</a>
+        <a class="{{ 'active' if active == 'video' else '' }}" href="{{ url_for('video_page') }}">视频打卡</a>
+        <a class="{{ 'active' if active == 'persons' else '' }}" href="{{ url_for('persons_page') }}">人员管理</a>
+        <a class="{{ 'active' if active == 'inside' else '' }}" href="{{ url_for('inside_page') }}">场馆人员</a>
+        <a class="{{ 'active' if active == 'records' else '' }}" href="{{ url_for('records_page') }}">到馆记录</a>
+        <a class="{{ 'active' if active == 'analytics' else '' }}" href="{{ url_for('analytics_page') }}">数据分析</a>
+        <a class="{{ 'active' if active == 'settings' else '' }}" href="{{ url_for('settings_page') }}">系统设置</a>
+      </nav>
+    </aside>
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">体育馆视频打卡管理系统</p>
+          <h1>{{ title }}</h1>
+        </div>
+        <a class="ghost-button" href="{{ url_for('logout') }}">退出登录</a>
+      </header>
+      <section class="content">
+        {% block content %}{% endblock %}
+      </section>
+    </main>
+  </div>
+  <div id="toast" class="toast"></div>
+  <script src="{{ url_for('static', filename='js/app.js') }}?v=4"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

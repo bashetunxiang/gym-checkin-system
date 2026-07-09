@@ -1,329 +1,244 @@
-from util import public_tools as tool
-from util import camera
-from service import hr_service as hr
+from __future__ import annotations
+
+from entity.organizations import GymCheckinRecord
+from service.attendance_service import GymAttendanceService
+from service.hr_service import login
+from service.person_service import PersonService
+from service.recognize_service import RecognizeService
+from service.record_service import GymRecordService
+from service.statistics_service import GymStatisticsService
+from util.public_tools import format_duration, prompt_optional, prompt_required
 
 
-ADMIN_LOGIN = False
+def print_header() -> None:
+    print("=" * 50)
+    print("体育馆视频打卡管理系统")
+    print("=" * 50)
 
 
-# ==========================
-# 管理员登录
-# ==========================
-def login():
-    global ADMIN_LOGIN
+def print_menu() -> None:
+    print()
+    print("1. 人员管理")
+    print("2. 人员进入场馆")
+    print("3. 人员离开场馆")
+    print("4. 查询当前在馆人员")
+    print("5. 查询全部到馆记录")
+    print("6. 查看数据统计")
+    print("7. 摄像头识别入馆")
+    print("8. 摄像头识别离馆")
+    print("9. 日报（今天在馆时长）")
+    print("10. 月报（本月在馆时长）")
+    print("0. 退出系统")
 
+
+def print_person_menu() -> None:
+    print()
+    print("1. 添加或更新人员")
+    print("2. 查看人员列表")
+    print("3. 查询人员")
+    print("0. 返回主菜单")
+
+
+def print_person(person: dict) -> None:
+    print(
+        f"编号: {person.get('person_id', '')} | 姓名: {person.get('name', '')} | "
+        f"电话: {person.get('phone', '')} | 备注: {person.get('remark', '')}"
+    )
+
+
+def print_record(record: GymCheckinRecord) -> None:
+    leave_time = record.leave_time or "未离馆"
+    print(
+        f"第{record.sequence}位 | 编号: {record.person_id} | 姓名: {record.person_name} | "
+        f"入馆: {record.enter_time} | 离馆: {leave_time} | 停留: {format_duration(record.duration_seconds)}"
+    )
+
+
+def print_duration_report(title: str, report: dict) -> None:
+    print(title)
+    print(f"统计范围：{report['start']} 至 {report['end']}")
+    print(f"到馆人数：{report['people_count']}")
+    print(f"到馆次数：{report['records_count']}")
+    print(f"累计在馆时长：{format_duration(report['total_stay_seconds'])}")
+    rows = report["rows"]
+    if not rows:
+        print("暂无在馆时长记录。")
+        return
+    for row in rows:
+        print(
+            f"编号: {row['person_id']} | 姓名: {row['person_name']} | "
+            f"到馆次数: {row['visit_count']} | 在馆时长: {format_duration(row['stay_seconds'])}"
+        )
+
+
+def handle_person_management(person_service: PersonService) -> None:
     while True:
-        username = input("请输入管理员账号（输入0取消操作）：").strip()
-
-        if username == "0":
-            return False
-
-        password = input("请输入管理员密码：").strip()
-
-        if hr.valid_user(username, password):
-            ADMIN_LOGIN = True
-            print(username + " 登录成功！")
-            return True
-        else:
-            print("账号或密码错误，请重新输入！")
-            print("-----------------------------")
-
-
-# ==========================
-# 检查管理员是否登录
-# ==========================
-def check_login():
-    if ADMIN_LOGIN:
-        return True
-
-    print("该功能需要管理员登录！")
-    return login()
-
-
-# ==========================
-# 系统启动
-# ==========================
-def start():
-    finish = False
-
-    menu = """
-+------------------------------------------------+
-|              体育馆视频打卡系统                |
-+------------------------------------------------+
-① 人员进入场馆
-② 人员离开场馆
-③ 人员管理
-④ 查看在馆人员
-⑤ 数据统计
-⑥ 查看全部记录
-⑦ 摄像头预览
-⑧ 退出系统
---------------------------------------------------
-"""
-
-    while not finish:
-        print(menu)
-        option = input("请输入菜单序号：").strip()
-
-        if option == "1":
-            person_enter()
-
-        elif option == "2":
-            if check_login():
-                person_leave()
-
-        elif option == "3":
-            if check_login():
-                employee_management()
-
-        elif option == "4":
-            if check_login():
-                show_online_people()
-
-        elif option == "5":
-            if check_login():
-                show_statistics()
-
-        elif option == "6":
-            if check_login():
-                show_all_records()
-
-        elif option == "7":
-            camera.preview()
-
-        elif option == "8":
-            finish = True
-
-        else:
-            print("输入的指令有误，请重新输入！")
-
-    print("Bye Bye!")
-
-
-# ==========================
-# 人员进入场馆
-# ==========================
-def person_enter():
-    print("请正面对准摄像头，系统正在识别...")
-
-    record = camera.clock_in()
-
-    if record is not None:
-        print("\n进入场馆成功！")
-        print_record(record)
-    else:
-        print("未识别到有效人员，进入失败。")
-
-
-# ==========================
-# 人员离开场馆
-# ==========================
-def person_leave():
-    print(hr.get_employee_report())
-
-    try:
-        person_id = int(input("请输入离馆人员编号（输入0取消）：").strip())
-    except ValueError:
-        print("输入格式错误，请输入数字编号！")
-        return
-
-    if person_id == 0:
-        return
-
-    if not hr.check_id(person_id):
-        print("无此人员，操作取消！")
-        return
-
-    record = camera.clock_out(person_id)
-
-    if record is not None:
-        print("\n离馆成功！")
-        print_record(record)
-    else:
-        print("该人员当前不在馆，无法离馆。")
-
-
-# ==========================
-# 人员管理
-# ==========================
-def employee_management():
-    menu = """
-+------------------------------------------------+
-|                人员管理功能菜单                |
-+------------------------------------------------+
-① 录入新人员
-② 删除人员
-③ 查看人员列表
-④ 返回上级菜单
---------------------------------------------------
-"""
-
-    while True:
-        print(menu)
-        option = input("请输入菜单序号：").strip()
-
-        if option == "1":
-            add_employee()
-
-        elif option == "2":
-            delete_employee()
-
-        elif option == "3":
-            print(hr.get_employee_report())
-
-        elif option == "4":
+        print_person_menu()
+        choice = input("请选择人员管理操作: ").strip()
+        if choice == "0":
             return
-
+        if choice == "1":
+            person_id = prompt_required("人员编号")
+            name = prompt_optional("人员姓名（可直接回车使用编号）", person_id)
+            phone = prompt_optional("联系电话")
+            remark = prompt_optional("备注")
+            person = person_service.add_or_update(person_id, name, phone, remark)
+            print("人员信息已保存。")
+            print_person(person)
+        elif choice == "2":
+            persons = person_service.list_persons()
+            if not persons:
+                print("暂无人员信息。")
+                continue
+            print(f"人员数量：{len(persons)}")
+            for person in persons:
+                print_person(person)
+        elif choice == "3":
+            person_id = prompt_required("人员编号")
+            person = person_service.find_person(person_id)
+            if person is None:
+                print("未找到该人员。")
+            else:
+                print_person(person)
         else:
-            print("输入的指令有误，请重新输入！")
+            print("无效操作，请重新选择。")
 
 
-# ==========================
-# 新增人员
-# ==========================
-def add_employee():
-    name = input("请输入新人员姓名（输入0取消）：").strip()
+def resolve_person_name(person_service: PersonService, person_id: str, typed_name: str) -> str:
+    if typed_name:
+        return typed_name
+    person = person_service.find_person(person_id)
+    if person:
+        return person.get("name") or person_id
+    return person_id
 
-    if name == "0":
+
+def handle_enter(
+    attendance_service: GymAttendanceService,
+    person_service: PersonService,
+) -> None:
+    person_id = prompt_required("人员编号")
+    typed_name = prompt_optional("人员姓名（可直接回车使用已登记姓名或编号）")
+    person_name = resolve_person_name(person_service, person_id, typed_name)
+    record = attendance_service.person_enter(person_id, person_name)
+    print(f"入馆成功：{record.person_name} 是第 {record.sequence} 个进入场馆人员。")
+    print_record(record)
+
+
+def handle_leave(attendance_service: GymAttendanceService) -> None:
+    person_id = prompt_required("人员编号")
+    record = attendance_service.person_leave(person_id)
+    print("离馆成功。")
+    print_record(record)
+
+
+def handle_current_inside(attendance_service: GymAttendanceService) -> None:
+    records = attendance_service.current_inside()
+    if not records:
+        print("当前没有在馆人员。")
         return
-
-    if name == "":
-        print("姓名不能为空！")
-        return
-
-    code = hr.add_new_employee(name)
-
-    print("请面对摄像头，按三次回车键完成拍照！")
-
-    camera.register(code)
-
-    print(name + " 录入成功！")
-
-
-# ==========================
-# 删除人员
-# ==========================
-def delete_employee():
-    print(hr.get_employee_report())
-
-    try:
-        person_id = int(input("请输入要删除的人员编号（输入0取消）：").strip())
-    except ValueError:
-        print("输入格式错误，请输入数字编号！")
-        return
-
-    if person_id == 0:
-        return
-
-    if not hr.check_id(person_id):
-        print("无此人员，操作取消！")
-        return
-
-    verification = tool.randomNumber(4)
-
-    input_ver = input("[" + str(verification) + "] 请输入验证码：").strip()
-
-    if str(verification) == input_ver:
-        hr.remove_employee(person_id)
-        print(str(person_id) + "号人员已删除！")
-    else:
-        print("验证码错误，操作取消！")
-
-
-# ==========================
-# 查看当前在馆人员
-# ==========================
-def show_online_people():
-    people = hr.get_online_people()
-
-    print("\n================ 当前在馆人员 ================")
-
-    if people is None or len(people) == 0:
-        print("当前暂无人员在馆。")
-        print("============================================")
-        return
-
-    for record in people:
-        print_record(record)
-
-    print("============================================")
-
-
-# ==========================
-# 查看全部记录
-# ==========================
-def show_all_records():
-    records = hr.get_record_all()
-
-    print("\n================ 全部到馆记录 ================")
-
-    if records is None or len(records) == 0:
-        print("暂无到馆记录。")
-        print("============================================")
-        return
-
+    print(f"当前在馆人数：{len(records)}")
     for record in records:
         print_record(record)
 
-    print("============================================")
+
+def handle_all_records(attendance_service: GymAttendanceService) -> None:
+    records = attendance_service.all_records()
+    if not records:
+        print("暂无到馆记录。")
+        return
+    print(f"全部到馆记录：{len(records)} 条")
+    for record in records:
+        print_record(record)
 
 
-# ==========================
-# 数据统计
-# ==========================
-def show_statistics():
-    data = hr.system_info()
-
-    print("\n================ 体育馆数据统计 ================")
-    print("人员总数：", data.get("employee_count", 0))
-    print("今日到馆人数：", data.get("today_total", 0))
-    print("当前在馆人数：", data.get("online_total", 0))
-    print("今日离馆人数：", data.get("leave_total", 0))
-    print("平均停留时间：", data.get("average_stay", "00:00:00"))
-
-    peak = hr.get_peak_hour()
-
-    if peak is not None:
-        print("人流高峰时段：{}点，人数：{}".format(
-            peak.get("hour"),
-            peak.get("count")
-        ))
-    else:
-        print("人流高峰时段：暂无数据")
-
-    print("===============================================")
+def handle_statistics(statistics_service: GymStatisticsService) -> None:
+    summary = statistics_service.today_summary()
+    print(f"统计日期：{summary['date']}")
+    print(f"今日到馆人数：{summary['today_enter_count']}")
+    print(f"当前在馆人数：{summary['current_inside_count']}")
+    print(f"今日离馆人数：{summary['today_leave_count']}")
+    print(f"今日累计在馆时长：{format_duration(summary['today_stay_seconds'])}")
+    print(f"平均停留时间：{format_duration(summary['average_stay_seconds'])}")
 
 
-# ==========================
-# 打印单条记录
-# ==========================
-def print_record(record):
-    if record is None:
+def handle_daily_report(statistics_service: GymStatisticsService) -> None:
+    report = statistics_service.daily_duration_report()
+    print_duration_report(f"日报：{report['date']} 在馆时长", report)
+
+
+def handle_monthly_report(statistics_service: GymStatisticsService) -> None:
+    report = statistics_service.monthly_duration_report()
+    print_duration_report(f"月报：{report['month']} 在馆时长", report)
+
+
+def handle_camera_enter(
+    attendance_service: GymAttendanceService,
+    recognize_service: RecognizeService,
+) -> None:
+    result = recognize_service.recognize_from_camera()
+    if result is None:
+        print("未识别到人员，请手动录入。")
+        result = recognize_service.manual_fallback()
+    person_id, person_name = result
+    record = attendance_service.person_enter(person_id, person_name)
+    print(f"识别入馆成功：第 {record.sequence} 个进入场馆。")
+    print_record(record)
+
+
+def handle_camera_leave(
+    attendance_service: GymAttendanceService,
+    recognize_service: RecognizeService,
+) -> None:
+    result = recognize_service.recognize_from_camera()
+    if result is None:
+        print("未识别到人员，请手动录入。")
+        result = recognize_service.manual_fallback()
+    person_id, _person_name = result
+    record = attendance_service.person_leave(person_id)
+    print("识别离馆成功。")
+    print_record(record)
+
+
+def main() -> None:
+    print_header()
+    if not login():
         return
 
-    print("--------------------------------")
-    print("人员编号：", record.get("person_id", ""))
-    print("姓名：", record.get("name", ""))
-    print("第几个进入场馆：第{}位".format(record.get("arrival_order", "")))
-    print("进入时间：", record.get("enter_time", ""))
-    print("离馆时间：", record.get("leave_time", ""))
-    print("停留时间：", record.get("stay_time", ""))
-    print("状态：", record.get("status", ""))
-    print("--------------------------------")
+    record_service = GymRecordService()
+    attendance_service = GymAttendanceService(record_service)
+    statistics_service = GymStatisticsService(record_service)
+    recognize_service = RecognizeService()
+    person_service = PersonService()
+
+    actions = {
+        "1": lambda: handle_person_management(person_service),
+        "2": lambda: handle_enter(attendance_service, person_service),
+        "3": lambda: handle_leave(attendance_service),
+        "4": lambda: handle_current_inside(attendance_service),
+        "5": lambda: handle_all_records(attendance_service),
+        "6": lambda: handle_statistics(statistics_service),
+        "7": lambda: handle_camera_enter(attendance_service, recognize_service),
+        "8": lambda: handle_camera_leave(attendance_service, recognize_service),
+        "9": lambda: handle_daily_report(statistics_service),
+        "10": lambda: handle_monthly_report(statistics_service),
+    }
+
+    while True:
+        print_menu()
+        choice = input("请选择操作: ").strip()
+        if choice == "0":
+            print("已退出系统。")
+            return
+        action = actions.get(choice)
+        if action is None:
+            print("无效操作，请重新选择。")
+            continue
+        try:
+            action()
+        except ValueError as exc:
+            print(exc)
 
 
-# ==========================
-# 程序入口
-# ==========================
 if __name__ == "__main__":
-    hr.load_emp_data()
-
-    title = """
-************************************************************
-*                  体育馆视频打卡管理系统                  *
-************************************************************
-"""
-
-    print(title)
-
-    start()
+    main()

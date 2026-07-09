@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="two-column">
+  <section class="panel video-panel">
+    <div class="panel-header">
+      <h2>视频打卡窗口</h2>
+      <span class="status-pill">util/camera.py / recognize_service.py</span>
+    </div>
+    <div class="camera-frame live-camera">
+      <div class="scan-line"></div>
+      <img id="cameraStream" alt="摄像头实时画面">
+      <div class="camera-copy">
+        <strong>OpenCV 人脸识别区域</strong>
+        <span id="cameraStatus">正在启动摄像头...</span>
+      </div>
+    </div>
+    <div class="camera-status-bar" id="cameraStatusBar">等待摄像头画面...</div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-header">
+      <h2>自动人脸打卡</h2>
+    </div>
+    <div class="form-grid">
+      <label>
+        <span>自动打卡模式</span>
+        <select id="autoCheckinMode">
+          <option value="enter">自动入馆</option>
+          <option value="leave">自动离馆</option>
+        </select>
+      </label>
+      <div class="button-row">
+        <button type="button" id="autoCheckinOnce">识别并打卡</button>
+        <button type="button" class="secondary" id="autoCheckinToggle">开启自动打卡</button>
+      </div>
+      <div id="autoCheckinResult" class="result-box"></div>
+    </div>
+  </section>
+</div>
+
+<div class="two-column">
+  <section class="panel">
+    <div class="panel-header">
+      <h2>人脸样本采集</h2>
+      <span class="status-pill">先添加人员，再采集样本</span>
+    </div>
+    <form id="faceEnrollForm" class="form-grid">
+      <label>
+        <span>人员编号</span>
+        <input name="person_id" required placeholder="例如：1001">
+      </label>
+      <div class="button-row">
+        <button type="submit">采集当前人脸</button>
+        <button type="button" class="secondary" id="trainFaceModel">训练识别模型</button>
+      </div>
+    </form>
+    <div id="faceEnrollResult" class="result-box"></div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-header">
+      <h2>手动视频打卡</h2>
+    </div>
+    <form id="checkinForm" class="form-grid">
+      <label>
+        <span>人员编号</span>
+        <input name="person_id" required>
+      </label>
+      <label>
+        <span>姓名</span>
+        <input name="person_name" placeholder="可为空，自动使用已登记姓名">
+      </label>
+      <div class="button-row">
+        <button type="button" data-action="enter">进入场馆</button>
+        <button type="button" class="secondary" data-action="leave">离开场馆</button>
+      </div>
+    </form>
+    <div id="checkinResult" class="result-box"></div>
+  </section>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>initVideoPage();</script>
+{% endblock %}

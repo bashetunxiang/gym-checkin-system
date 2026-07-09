@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+data/faces/
+data/face_model.yml
+data/face_labels.json
+*.log

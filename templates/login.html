@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>登录 - 体育馆视频打卡管理系统</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v=4">
+</head>
+<body class="login-page">
+  <main class="login-layout">
+    <section class="login-hero">
+      <p class="eyebrow">Gym Checkin System</p>
+      <h1>体育馆视频打卡管理系统</h1>
+      <p>围绕人员入馆、离馆、在馆统计与视频打卡的场馆管理控制台。</p>
+    </section>
+    <form id="loginForm" class="login-panel">
+      <h2>系统登录</h2>
+      <label>
+        <span>账号</span>
+        <input name="username" autocomplete="username" value="dhl" required>
+      </label>
+      <label>
+        <span>密码</span>
+        <input name="password" type="password" autocomplete="current-password" required>
+      </label>
+      <button type="submit">登录</button>
+      <p id="loginMessage" class="form-message"></p>
+    </form>
+  </main>
+  <script src="{{ url_for('static', filename='js/app.js') }}?v=4"></script>
+  <script>initLoginPage();</script>
+</body>
+</html>
