@@ -4,7 +4,10 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-import numpy as np
+try:
+    import numpy as np
+except ImportError:  # NumPy is optional until face model training is used.
+    np = None
 
 from util.camera import Camera, CameraError, cv2
 from util.io_tools import DATA_DIR, load_json_file, save_json_file
@@ -118,6 +121,8 @@ class RecognizeService:
     def train_model(self) -> Dict[str, Any]:
         if cv2 is None:
             raise ValueError("未安装 OpenCV。")
+        if np is None:
+            raise ValueError("未安装 NumPy，无法训练人脸识别模型。")
         recognizer = self._new_recognizer()
         if recognizer is None:
             raise ValueError("当前 OpenCV 缺少 cv2.face，请安装 opencv-contrib-python。")

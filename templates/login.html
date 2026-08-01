@@ -4,9 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>登录 - 体育馆视频打卡管理系统</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v=4">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v=7">
 </head>
 <body class="login-page">
+  {% include "_time_sky.html" %}
   <main class="login-layout">
     <section class="login-hero">
       <p class="eyebrow">Gym Checkin System</p>
@@ -17,7 +18,7 @@
       <h2>系统登录</h2>
       <label>
         <span>账号</span>
-        <input name="username" autocomplete="username" value="dhl" required>
+        <input name="username" autocomplete="username" placeholder="请输入账号" required>
       </label>
       <label>
         <span>密码</span>
@@ -25,9 +26,13 @@
       </label>
       <button type="submit">登录</button>
       <p id="loginMessage" class="form-message"></p>
+      <div class="auth-links">
+        <a href="{{ url_for('register_page') }}">注册新账号</a>
+        <a href="{{ url_for('forgot_password_page') }}">忘记密码</a>
+      </div>
     </form>
   </main>
-  <script src="{{ url_for('static', filename='js/app.js') }}?v=4"></script>
+  <script src="{{ url_for('static', filename='js/app.js') }}?v=7"></script>
   <script>initLoginPage();</script>
 </body>
 </html>

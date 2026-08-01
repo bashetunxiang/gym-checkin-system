@@ -19,6 +19,34 @@
   </article>
 </div>
 
+<section class="panel security-panel">
+  <div class="panel-header">
+    <div>
+      <p class="eyebrow">账户安全</p>
+      <h2>修改密码</h2>
+    </div>
+  </div>
+  {% if session.get('must_change_password') %}
+  <div class="notice-banner">你当前使用的是初始密码，请立即设置新密码。</div>
+  {% endif %}
+  <form id="changePasswordForm" class="form-grid compact-form">
+    <label>
+      <span>当前密码</span>
+      <input name="current_password" type="password" autocomplete="current-password" required>
+    </label>
+    <label>
+      <span>新密码（至少 8 位）</span>
+      <input name="new_password" type="password" minlength="8" autocomplete="new-password" required>
+    </label>
+    <label>
+      <span>确认新密码</span>
+      <input name="confirm_password" type="password" minlength="8" autocomplete="new-password" required>
+    </label>
+    <button type="submit">保存新密码</button>
+    <p id="changePasswordMessage" class="form-message"></p>
+  </form>
+</section>
+
 <section class="panel">
   <div class="panel-header">
     <h2>数据文件状态</h2>
