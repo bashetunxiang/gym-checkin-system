@@ -39,7 +39,10 @@ function recordCells(record, includeStatus = false) {
     `<td>${record.leave_time || "未离馆"}</td>`,
     `<td>${record.duration_text}</td>`,
   ];
-  if (includeStatus) cells.push(`<td>${record.status}</td>`);
+  if (includeStatus) {
+    const statusClass = record.status === "在馆" ? "is-inside" : "is-left";
+    cells.push(`<td><span class="status-badge ${statusClass}">${record.status}</span></td>`);
+  }
   return cells.join("");
 }
 
@@ -60,6 +63,79 @@ function initLoginPage() {
         }),
       });
       window.location.href = result.redirect || "/dashboard";
+    } catch (error) {
+      message.textContent = error.message;
+    }
+  });
+}
+
+function initRegisterPage() {
+  const form = document.getElementById("registerForm");
+  const message = document.getElementById("registerMessage");
+  const card = document.getElementById("initialPasswordCard");
+  const passwordNode = document.getElementById("initialPassword");
+  const copyButton = document.getElementById("copyInitialPassword");
+  if (!form) return;
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    message.textContent = "";
+    message.classList.remove("success");
+    card.hidden = true;
+    const formData = new FormData(form);
+    try {
+      const result = await apiRequest("/api/register", {
+        method: "POST",
+        body: JSON.stringify({ username: formData.get("username") }),
+      });
+      passwordNode.textContent = result.initial_password;
+      card.hidden = false;
+      message.textContent = result.message;
+      message.classList.add("success");
+      form.querySelector("button").disabled = true;
+    } catch (error) {
+      message.textContent = error.message;
+    }
+  });
+
+  if (copyButton) {
+    copyButton.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(passwordNode.textContent);
+        copyButton.textContent = "已复制";
+      } catch (_error) {
+        copyButton.textContent = "请手动复制";
+      }
+    });
+  }
+}
+
+function initForgotPasswordPage() {
+  const form = document.getElementById("forgotPasswordForm");
+  const message = document.getElementById("forgotPasswordMessage");
+  if (!form) return;
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    message.textContent = "";
+    message.classList.remove("success");
+    const formData = new FormData(form);
+    try {
+      const result = await apiRequest("/api/password/forgot", {
+        method: "POST",
+        body: JSON.stringify({
+          username: formData.get("username"),
+          initial_password: formData.get("initial_password"),
+          new_password: formData.get("new_password"),
+          confirm_password: formData.get("confirm_password"),
+        }),
+      });
+      message.textContent = result.message;
+      message.classList.add("success");
+      form.reset();
+      window.setTimeout(() => {
+        window.location.href = result.redirect || "/login";
+      }, 1200);
     } catch (error) {
       message.textContent = error.message;
     }
@@ -128,9 +204,22 @@ async function renderDailyChart(id = "dailyChart") {
   await ensureEcharts();
   const analytics = await apiRequest("/api/analytics");
   const daily = analytics.daily;
+  const dailyGradient = window.echarts
+    ? new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+      { offset: 0, color: "#53c7ff" },
+      { offset: 0.55, color: "#478cff" },
+      { offset: 1, color: "#735cff" },
+    ])
+    : "#35b9ff";
   renderChart(id, {
     backgroundColor: "transparent",
-    tooltip: { trigger: "axis" },
+    tooltip: {
+      trigger: "axis",
+      backgroundColor: "rgba(7, 20, 40, 0.94)",
+      borderColor: "rgba(83, 199, 255, 0.35)",
+      textStyle: { color: "#eaf5ff" },
+      axisPointer: { type: "shadow", shadowStyle: { color: "rgba(83,199,255,0.06)" } },
+    },
     grid: { left: 42, right: 18, top: 30, bottom: 34 },
     xAxis: {
       type: "category",
@@ -148,7 +237,12 @@ async function renderDailyChart(id = "dailyChart") {
         name: "到馆次数",
         type: "bar",
         data: daily.map((item) => item.records_count),
-        itemStyle: { color: "#1fb6ff" },
+        itemStyle: {
+          color: dailyGradient,
+          borderRadius: [7, 7, 2, 2],
+          shadowBlur: 14,
+          shadowColor: "rgba(61, 151, 255, 0.28)",
+        },
         barMaxWidth: 28,
       },
     ],
@@ -390,8 +484,20 @@ async function initAnalyticsPage() {
   const analytics = await renderDailyChart("analyticsDailyChart");
   const rows = analytics.monthly_rows;
   setText("monthlyTotal", `累计 ${analytics.monthly_total_text}`);
+  const monthlyGradient = window.echarts
+    ? new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+      { offset: 0, color: "#52f0c2" },
+      { offset: 0.55, color: "#28c7bd" },
+      { offset: 1, color: "#438cff" },
+    ])
+    : "#33dfb0";
   renderChart("analyticsMonthlyChart", {
-    tooltip: { trigger: "axis" },
+    tooltip: {
+      trigger: "axis",
+      backgroundColor: "rgba(7, 20, 40, 0.94)",
+      borderColor: "rgba(51, 223, 176, 0.35)",
+      textStyle: { color: "#eaf5ff" },
+    },
     grid: { left: 52, right: 18, top: 30, bottom: 34 },
     xAxis: {
       type: "category",
@@ -408,7 +514,12 @@ async function initAnalyticsPage() {
       name: "在馆分钟",
       type: "bar",
       data: rows.map((item) => Math.round(Number(item.stay_seconds || 0) / 60)),
-      itemStyle: { color: "#23d3a6" },
+      itemStyle: {
+        color: monthlyGradient,
+        borderRadius: [7, 7, 2, 2],
+        shadowBlur: 14,
+        shadowColor: "rgba(51, 223, 176, 0.24)",
+      },
       barMaxWidth: 30,
     }],
   });
@@ -447,5 +558,90 @@ async function loadSettings() {
 function initSettingsPage() {
   const refresh = document.getElementById("refreshSettings");
   if (refresh) refresh.addEventListener("click", loadSettings);
+  initChangePasswordForm();
   loadSettings();
+}
+
+function initChangePasswordForm() {
+  const form = document.getElementById("changePasswordForm");
+  const message = document.getElementById("changePasswordMessage");
+  if (!form) return;
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    message.textContent = "";
+    message.classList.remove("success");
+    const formData = new FormData(form);
+    try {
+      const result = await apiRequest("/api/password/change", {
+        method: "POST",
+        body: JSON.stringify({
+          current_password: formData.get("current_password"),
+          new_password: formData.get("new_password"),
+          confirm_password: formData.get("confirm_password"),
+        }),
+      });
+      message.textContent = result.message;
+      message.classList.add("success");
+      form.reset();
+      const notice = document.querySelector(".notice-banner");
+      if (notice) notice.remove();
+    } catch (error) {
+      message.textContent = error.message;
+    }
+  });
+}
+
+function initTimeSky() {
+  const sky = document.getElementById("timeSky");
+  const timeNode = document.getElementById("skyTime");
+  const dateNode = document.getElementById("skyDate");
+  const periodNode = document.getElementById("skyPeriod");
+  if (!sky || !timeNode || !dateNode || !periodNode || sky.dataset.ready) return;
+  sky.dataset.ready = "true";
+
+  const update = () => {
+    const now = new Date();
+    const hour = now.getHours();
+    const preciseHour = hour + now.getMinutes() / 60 + now.getSeconds() / 3600;
+    const isDay = preciseHour >= 6 && preciseHour < 18;
+    const progress = isDay
+      ? (preciseHour - 6) / 12
+      : ((preciseHour >= 18 ? preciseHour - 18 : preciseHour + 6) / 12);
+    const x = 4 + progress * 92;
+    const y = 76 - Math.sin(Math.PI * progress) * 58;
+
+    sky.style.setProperty("--orb-x", `${x}%`);
+    sky.style.setProperty("--orb-y", `${y}%`);
+    sky.classList.toggle("day", isDay);
+    sky.classList.toggle("night", !isDay);
+    sky.classList.toggle("dawn", preciseHour >= 5 && preciseHour < 8);
+    sky.classList.toggle("dusk", preciseHour >= 17 && preciseHour < 20);
+
+    timeNode.textContent = new Intl.DateTimeFormat("zh-CN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    }).format(now);
+    dateNode.textContent = new Intl.DateTimeFormat("zh-CN", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      weekday: "long",
+    }).format(now);
+    if (hour >= 5 && hour < 8) periodNode.textContent = "清晨 · 太阳升起";
+    else if (hour >= 8 && hour < 12) periodNode.textContent = "上午 · 日光渐盛";
+    else if (hour >= 12 && hour < 17) periodNode.textContent = "下午 · 太阳西行";
+    else if (hour >= 17 && hour < 20) periodNode.textContent = "傍晚 · 日落时分";
+    else periodNode.textContent = "夜间 · 月亮巡行";
+  };
+
+  update();
+  window.setInterval(update, 1000);
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initTimeSky);
+} else {
+  initTimeSky();
 }

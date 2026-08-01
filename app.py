@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import base64
+import os
+import secrets
 import threading
 import time
 from datetime import date, timedelta
@@ -22,7 +24,7 @@ from util.camera import Camera, CameraError, cv2
 
 
 app = Flask(__name__)
-app.secret_key = "gym-checkin-system-secret-key"
+app.secret_key = os.environ.get("GYM_CHECKIN_SECRET_KEY") or secrets.token_hex(32)
 app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
 
 
@@ -188,6 +190,20 @@ def index() -> Any:
 @app.route("/login")
 def login_page() -> str:
     return render_template("login.html")
+
+
+@app.route("/register")
+def register_page() -> Any:
+    if session.get("logged_in"):
+        return redirect(url_for("dashboard_page"))
+    return render_template("register.html")
+
+
+@app.route("/forgot-password")
+def forgot_password_page() -> Any:
+    if session.get("logged_in"):
+        return redirect(url_for("settings_page"))
+    return render_template("forgot_password.html")
 
 
 @app.route("/logout")
@@ -414,11 +430,92 @@ def api_login() -> Any:
     payload = request.get_json(silent=True) or {}
     username = str(payload.get("username", "")).strip()
     password = str(payload.get("password", "")).strip()
-    if AccountService().authenticate(username, password):
+    account_service = AccountService()
+    if account_service.authenticate(username, password):
         session["logged_in"] = True
         session["username"] = username
-        return jsonify({"ok": True, "redirect": url_for("dashboard_page")})
+        must_change_password = account_service.needs_password_change(username)
+        session["must_change_password"] = must_change_password
+        redirect_url = url_for("settings_page") if must_change_password else url_for("dashboard_page")
+        return jsonify(
+            {
+                "ok": True,
+                "data": {
+                    "redirect": redirect_url,
+                    "must_change_password": must_change_password,
+                },
+            }
+        )
     return jsonify({"ok": False, "message": "账号或密码错误。"}), 401
+
+
+@app.post("/api/register")
+def api_register() -> Any:
+    payload = request.get_json(silent=True) or {}
+    username = str(payload.get("username", "")).strip()
+    try:
+        initial_password = AccountService().register(username)
+    except ValueError as exc:
+        status = 409 if "已有人注册" in str(exc) else 400
+        return jsonify({"ok": False, "message": str(exc)}), status
+    return (
+        jsonify(
+            {
+                "ok": True,
+                "data": {
+                    "username": username,
+                    "initial_password": initial_password,
+                    "message": "注册成功，请保存初始密码。首次登录后请立即修改密码。",
+                },
+            }
+        ),
+        201,
+    )
+
+
+@app.post("/api/password/forgot")
+def api_forgot_password() -> Any:
+    payload = request.get_json(silent=True) or {}
+    username = str(payload.get("username", "")).strip()
+    initial_password = str(payload.get("initial_password", ""))
+    new_password = str(payload.get("new_password", ""))
+    confirm_password = str(payload.get("confirm_password", ""))
+    if new_password != confirm_password:
+        return jsonify({"ok": False, "message": "两次输入的新密码不一致。"}), 400
+    try:
+        AccountService().reset_password(username, initial_password, new_password)
+    except ValueError as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 400
+    return jsonify(
+        {
+            "ok": True,
+            "data": {
+                "message": "密码已重置，请使用新密码登录。",
+                "redirect": url_for("login_page"),
+            },
+        }
+    )
+
+
+@app.post("/api/password/change")
+@api_login_required
+def api_change_password() -> Any:
+    payload = request.get_json(silent=True) or {}
+    current_password = str(payload.get("current_password", ""))
+    new_password = str(payload.get("new_password", ""))
+    confirm_password = str(payload.get("confirm_password", ""))
+    if new_password != confirm_password:
+        return jsonify({"ok": False, "message": "两次输入的新密码不一致。"}), 400
+    try:
+        AccountService().change_password(
+            str(session.get("username", "")),
+            current_password,
+            new_password,
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 400
+    session["must_change_password"] = False
+    return jsonify({"ok": True, "data": {"message": "密码修改成功。"}})
 
 
 @app.get("/api/summary")

@@ -78,20 +78,41 @@ def try_save_json_file(path: str | Path, data: Any) -> bool:
     return True
 
 
-def load_user_passwords() -> Dict[str, str]:
+def load_account_data() -> Dict[str, Any]:
+    """Load account data while accepting the original username/password mapping."""
     data = load_json_file_with_legacy(
         USER_PASSWORD_FILE,
         LEGACY_USER_PASSWORD_FILE,
         DEFAULT_PASSWORDS,
     )
     if not isinstance(data, dict):
-        data = {}
+        data = DEFAULT_PASSWORDS
 
-    normalized = {str(key): str(value) for key, value in data.items()}
-    normalized.update(DEFAULT_PASSWORDS)
-    if normalized != data:
-        try_save_json_file(USER_PASSWORD_FILE, normalized)
-    return normalized
+    if isinstance(data.get("accounts"), dict):
+        return {"version": 2, "accounts": data["accounts"]}
+
+    return {
+        "version": 1,
+        "accounts": {str(key): str(value) for key, value in data.items()},
+    }
+
+
+def save_account_data(data: Dict[str, Any]) -> None:
+    save_json_file(USER_PASSWORD_FILE, data)
+
+
+def load_user_passwords() -> Dict[str, str]:
+    """Return legacy plain-text accounts only; retained for older callers."""
+    account_data = load_account_data()
+    accounts = account_data.get("accounts", {})
+    if not isinstance(accounts, dict):
+        return {}
+
+    return {
+        str(username): str(value)
+        for username, value in accounts.items()
+        if isinstance(value, str)
+    }
 
 
 def normalize_lock_record_data(data: Any) -> Dict[str, Any]:
