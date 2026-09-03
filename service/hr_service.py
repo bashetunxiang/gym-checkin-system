@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import re
-import secrets
 import threading
 from datetime import datetime
 from typing import Any, Dict
@@ -13,7 +12,7 @@ from util.io_tools import load_account_data, save_account_data
 
 ACCOUNT_LOCK = threading.RLock()
 USERNAME_PATTERN = re.compile(r"^[A-Za-z0-9_.-]{3,32}$")
-INITIAL_PASSWORD_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+DEFAULT_INITIAL_PASSWORD = "88888888"
 
 
 class AccountService:
@@ -78,8 +77,7 @@ class AccountService:
 
     @staticmethod
     def _generate_initial_password() -> str:
-        token = "".join(secrets.choice(INITIAL_PASSWORD_ALPHABET) for _ in range(10))
-        return f"{token[:5]}-{token[5:]}"
+        return DEFAULT_INITIAL_PASSWORD
 
     def _reload(self) -> None:
         self.store = self._load_and_migrate()

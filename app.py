@@ -5,7 +5,7 @@ import os
 import secrets
 import threading
 import time
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from functools import wraps
 from pathlib import Path
 from typing import Any, Callable, Dict, List
@@ -170,6 +170,25 @@ def record_to_dict(record: Any) -> Dict[str, Any]:
     return data
 
 
+def inside_record_to_dict(record: Any) -> Dict[str, Any]:
+    """Add live duration fields used by the dashboard's current-visitor list."""
+    data = record_to_dict(record)
+    now = datetime.now()
+    try:
+        entered_at = datetime.strptime(str(data.get("enter_time", "")), "%Y-%m-%d %H:%M:%S")
+        today_started_at = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        total_seconds = max(0, int((now - entered_at).total_seconds()))
+        today_seconds = max(0, int((now - max(entered_at, today_started_at)).total_seconds()))
+    except (TypeError, ValueError):
+        total_seconds = 0
+        today_seconds = 0
+    data["today_inside_seconds"] = today_seconds
+    data["today_inside_text"] = format_duration(today_seconds)
+    data["inside_total_seconds"] = total_seconds
+    data["inside_total_text"] = format_duration(total_seconds)
+    return data
+
+
 def report_row_to_dict(row: Dict[str, Any]) -> Dict[str, Any]:
     item = dict(row)
     item["stay_text"] = format_duration(int(item.get("stay_seconds", 0)))
@@ -190,6 +209,34 @@ def index() -> Any:
 @app.route("/login")
 def login_page() -> str:
     return render_template("login.html")
+
+
+@app.route("/face-login")
+def legacy_face_login_page() -> Any:
+    return redirect(url_for("face_checkin_page", mode="enter"))
+
+
+@app.route("/face-checkin/<mode>")
+def face_checkin_page(mode: str) -> Any:
+    if mode not in {"enter", "leave"}:
+        return redirect(url_for("login_page"))
+    page = {
+        "enter": {
+            "title": "入馆人脸打卡",
+            "eyebrow": "Entrance Check-in",
+            "action": "进入场馆",
+            "button": "识别人脸并记录入馆",
+            "instruction": "入口设备：识别成功后记录人员到馆时间。",
+        },
+        "leave": {
+            "title": "离馆人脸打卡",
+            "eyebrow": "Exit Check-out",
+            "action": "离开场馆",
+            "button": "识别人脸并记录离馆",
+            "instruction": "出口设备：识别成功后记录人员离馆时间与停留时长。",
+        },
+    }[mode]
+    return render_template("face_checkin.html", mode=mode, page=page)
 
 
 @app.route("/register")
@@ -254,14 +301,24 @@ def video_feed() -> Response:
     )
 
 
-@app.get("/api/camera/status")
-@api_login_required
-def api_camera_status() -> Any:
+@app.route("/login/video_feed")
+@app.route("/public/video_feed")
+def public_video_feed() -> Response:
+    """Public camera preview used by the entrance and exit terminals."""
+    return Response(
+        generate_camera_frames(),
+        mimetype="multipart/x-mixed-replace; boundary=frame",
+    )
+
+
+def camera_status_payload() -> Dict[str, Any]:
     if cv2 is None:
-        return jsonify({"ok": True, "data": {"available": False, "message": "未安装 OpenCV。"}})
+        return {"available": False, "opencv_installed": False, "message": "未安装 OpenCV。"}
 
     recognize_service = RecognizeService()
     status = camera_stream.snapshot()
+    status["opencv_installed"] = True
+    status["opencv_version"] = str(getattr(cv2, "__version__", "未知版本"))
     if recognize_service.face_detection_available:
         model_message = "人脸检测已启用。"
     else:
@@ -270,7 +327,24 @@ def api_camera_status() -> Any:
         status["message"] = f"{status['message']} {model_message}"
     elif status["message"] == "摄像头尚未启动。":
         status["message"] = f"摄像头正在启动... {model_message}"
-    return jsonify({"ok": True, "data": status})
+    elif str(status["message"]).startswith("无法打开摄像头"):
+        status["message"] = (
+            f"OpenCV {status['opencv_version']} 已安装，但{status['message']}。"
+            "请关闭占用摄像头的程序，并检查 Windows 相机权限。"
+        )
+    return status
+
+
+@app.get("/api/camera/status")
+@api_login_required
+def api_camera_status() -> Any:
+    return jsonify({"ok": True, "data": camera_status_payload()})
+
+
+@app.get("/api/login/camera/status")
+@app.get("/api/public/camera/status")
+def api_public_camera_status() -> Any:
+    return jsonify({"ok": True, "data": camera_status_payload()})
 
 
 @app.get("/api/camera/frame")
@@ -449,6 +523,55 @@ def api_login() -> Any:
     return jsonify({"ok": False, "message": "账号或密码错误。"}), 401
 
 
+@app.post("/api/public/face-checkin")
+def api_public_face_checkin() -> Any:
+    payload = request.get_json(silent=True) or {}
+    mode = str(payload.get("mode", "")).strip()
+    if mode not in {"enter", "leave"}:
+        return jsonify({"ok": False, "message": "请选择入馆或离馆打卡模式。"}), 400
+
+    frame = camera_stream.raw_frame()
+    if frame is None:
+        return jsonify({"ok": False, "message": "摄像头画面尚未准备好，请稍后重试。"}), 400
+
+    recognition = RecognizeService().best_recognition(frame)
+    if not recognition.get("recognized") or not recognition.get("person_id"):
+        return jsonify({"ok": False, "message": "未识别到已录入的人脸，请正对摄像头后重试。"}), 401
+
+    person_id = str(recognition["person_id"])
+    person = PersonService().find_person(person_id)
+    if not person:
+        return jsonify({"ok": False, "message": f"识别到人员 {person_id}，但人员档案不存在。"}), 404
+
+    person_name = str(person.get("name") or person_id)
+    record_service, attendance_service, _statistics_service = make_services()
+    try:
+        if mode == "enter":
+            if record_service.find_open_record(person_id):
+                return jsonify({"ok": False, "message": f"{person_name} 当前已在馆，不能重复入馆。"}), 409
+            record = attendance_service.person_enter(person_id, person_name)
+            action_text = "入馆"
+        else:
+            record = attendance_service.person_leave(person_id)
+            action_text = "离馆"
+    except ValueError as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 400
+
+    return jsonify(
+        {
+            "ok": True,
+            "data": {
+                "action": mode,
+                "person_id": person_id,
+                "person_name": person_name,
+                "message": f"{person_name} {action_text}打卡成功。",
+                "record": record_to_dict(record),
+                "recognition": recognition,
+            },
+        }
+    )
+
+
 @app.post("/api/register")
 def api_register() -> Any:
     payload = request.get_json(silent=True) or {}
@@ -585,7 +708,7 @@ def api_leave() -> Any:
 @api_login_required
 def api_inside() -> Any:
     _record_service, attendance_service, _statistics_service = make_services()
-    records = [record_to_dict(record) for record in attendance_service.current_inside()]
+    records = [inside_record_to_dict(record) for record in attendance_service.current_inside()]
     return jsonify({"ok": True, "data": records})
 
 

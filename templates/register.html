@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>注册账号 - 体育馆视频打卡管理系统</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v=7">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v=9">
 </head>
 <body class="login-page">
   {% include "_time_sky.html" %}
@@ -12,7 +12,7 @@
     <section class="login-hero">
       <p class="eyebrow">Create your account</p>
       <h1>注册新账号</h1>
-      <p>构造一个专属账号。注册成功后系统会分配初始密码，请妥善保存，它也是忘记密码时的身份凭证。</p>
+      <p>构造一个专属账号。新用户的初始密码统一为 88888888，它也是忘记密码时的身份凭证。</p>
     </section>
     <section class="login-panel">
       <form id="registerForm" class="auth-form">
@@ -21,7 +21,7 @@
           <span>自定义账号</span>
           <input name="username" minlength="3" maxlength="32" pattern="[A-Za-z0-9_.-]+" autocomplete="username" placeholder="3–32 位字母或数字" required>
         </label>
-        <button type="submit">生成初始密码</button>
+        <button type="submit">注册并获取初始密码</button>
         <p id="registerMessage" class="form-message"></p>
       </form>
       <div id="initialPasswordCard" class="initial-password-card" hidden>
@@ -35,7 +35,7 @@
       </div>
     </section>
   </main>
-  <script src="{{ url_for('static', filename='js/app.js') }}?v=7"></script>
+  <script src="{{ url_for('static', filename='js/app.js') }}?v=9"></script>
   <script>initRegisterPage();</script>
 </body>
 </html>

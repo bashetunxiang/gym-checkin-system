@@ -3,9 +3,11 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import Mock, patch
 
 import util.io_tools as io_tools
 from app import app
+from entity.organizations import GymCheckinRecord
 from service.hr_service import AccountService
 
 
@@ -28,7 +30,7 @@ class AccountFlowTestCase(unittest.TestCase):
         register = self.client.post("/api/register", json={"username": "new.member"})
         self.assertEqual(register.status_code, 201)
         initial_password = register.get_json()["data"]["initial_password"]
-        self.assertTrue(initial_password)
+        self.assertEqual(initial_password, "88888888")
 
         duplicate = self.client.post("/api/register", json={"username": "NEW.member"})
         self.assertEqual(duplicate.status_code, 409)
@@ -47,7 +49,8 @@ class AccountFlowTestCase(unittest.TestCase):
         self.assertIn(b'id="timeSky"', settings_page.data)
         self.assertIn(b'id="changePasswordForm"', settings_page.data)
         self.assertIn(b'class="app-page page-settings"', settings_page.data)
-        self.assertIn(b'class="topbar-actions"', settings_page.data)
+        self.assertIn(b'id="sidebarToggle"', settings_page.data)
+        self.assertIn(b'class="sidebar-account"', settings_page.data)
 
         for path in ("/dashboard", "/persons", "/inside", "/records", "/analytics"):
             response = self.client.get(path)
@@ -90,6 +93,102 @@ class AccountFlowTestCase(unittest.TestCase):
             response = self.client.get(path)
             self.assertEqual(response.status_code, 200)
             self.assertIn(b'id="timeSky"', response.data)
+
+        login_page = self.client.get("/login")
+        self.assertIn("进入系统".encode("utf-8"), login_page.data)
+        self.assertIn("进入场馆".encode("utf-8"), login_page.data)
+        self.assertIn("离开场馆".encode("utf-8"), login_page.data)
+        self.assertIn(b'href="/face-checkin/enter"', login_page.data)
+        self.assertIn(b'href="/face-checkin/leave"', login_page.data)
+
+        for mode in ("enter", "leave"):
+            face_page = self.client.get(f"/face-checkin/{mode}")
+            self.assertEqual(face_page.status_code, 200)
+            self.assertIn(b'id="loginCameraFeed"', face_page.data)
+            self.assertIn(b'id="faceLoginButton"', face_page.data)
+            self.assertIn(f'initFaceCheckinPage("{mode}")'.encode(), face_page.data)
+
+    def test_public_face_checkin_records_attendance_without_login(self) -> None:
+        recognition = {
+            "recognized": True,
+            "person_id": "P001",
+            "confidence": 26.5,
+            "face_count": 1,
+        }
+        record = GymCheckinRecord(
+            sequence=1,
+            person_id="P001",
+            person_name="测试人员",
+            enter_time="2026-09-03 08:00:00",
+        )
+        record_service = Mock()
+        record_service.find_open_record.return_value = None
+        attendance_service = Mock()
+        attendance_service.person_enter.return_value = record
+        with (
+            patch("app.camera_stream.raw_frame", return_value=object()),
+            patch("app.RecognizeService") as recognize_service,
+            patch("app.PersonService") as person_service,
+            patch(
+                "app.make_services",
+                return_value=(record_service, attendance_service, Mock()),
+            ),
+        ):
+            recognize_service.return_value.best_recognition.return_value = recognition
+            person_service.return_value.find_person.return_value = {
+                "person_id": "P001",
+                "name": "测试人员",
+            }
+            response = self.client.post("/api/public/face-checkin", json={"mode": "enter"})
+
+        self.assertEqual(response.status_code, 200)
+        result = response.get_json()["data"]
+        self.assertEqual(result["action"], "enter")
+        self.assertEqual(result["person_name"], "测试人员")
+        attendance_service.person_enter.assert_called_once_with("P001", "测试人员")
+        dashboard = self.client.get("/dashboard")
+        self.assertEqual(dashboard.status_code, 302)
+        self.assertIn("/login", dashboard.headers["Location"])
+
+    def test_public_face_checkout_records_leave_time(self) -> None:
+        recognition = {
+            "recognized": True,
+            "person_id": "P001",
+            "confidence": 25.0,
+            "face_count": 1,
+        }
+        record = GymCheckinRecord(
+            sequence=1,
+            person_id="P001",
+            person_name="测试人员",
+            enter_time="2026-09-03 08:00:00",
+            leave_time="2026-09-03 10:00:00",
+            duration_seconds=7200,
+        )
+        attendance_service = Mock()
+        attendance_service.person_leave.return_value = record
+        with (
+            patch("app.camera_stream.raw_frame", return_value=object()),
+            patch("app.RecognizeService") as recognize_service,
+            patch("app.PersonService") as person_service,
+            patch(
+                "app.make_services",
+                return_value=(Mock(), attendance_service, Mock()),
+            ),
+        ):
+            recognize_service.return_value.best_recognition.return_value = recognition
+            person_service.return_value.find_person.return_value = {
+                "person_id": "P001",
+                "name": "测试人员",
+            }
+            response = self.client.post("/api/public/face-checkin", json={"mode": "leave"})
+
+        self.assertEqual(response.status_code, 200)
+        result = response.get_json()["data"]
+        self.assertEqual(result["action"], "leave")
+        self.assertEqual(result["record"]["leave_time"], "2026-09-03 10:00:00")
+        self.assertEqual(result["record"]["duration_text"], "2小时0分钟0秒")
+        attendance_service.person_leave.assert_called_once_with("P001")
 
 
 if __name__ == "__main__":

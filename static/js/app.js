@@ -26,6 +26,37 @@ function setText(id, value) {
   if (node) node.textContent = value;
 }
 
+function initSidebarToggle() {
+  const shell = document.getElementById("appShell");
+  const button = document.getElementById("sidebarToggle");
+  if (!shell || !button) return;
+
+  function applyState(collapsed, save = true) {
+    shell.classList.toggle("sidebar-collapsed", collapsed);
+    button.setAttribute("aria-expanded", String(!collapsed));
+    button.title = collapsed ? "打开左侧菜单" : "收起左侧菜单";
+    if (save) {
+      try {
+        window.localStorage.setItem("gym-sidebar-collapsed", collapsed ? "1" : "0");
+      } catch (_error) {
+        // Storage can be unavailable in private browsing; the button still works.
+      }
+    }
+  }
+
+  let collapsed = false;
+  try {
+    collapsed = window.localStorage.getItem("gym-sidebar-collapsed") === "1";
+  } catch (_error) {
+    collapsed = false;
+  }
+  applyState(collapsed, false);
+
+  button.addEventListener("click", () => {
+    applyState(!shell.classList.contains("sidebar-collapsed"));
+  });
+}
+
 function emptyRow(colspan, text = "暂无数据") {
   return `<tr><td colspan="${colspan}">${text}</td></tr>`;
 }
@@ -50,6 +81,7 @@ function initLoginPage() {
   const form = document.getElementById("loginForm");
   const message = document.getElementById("loginMessage");
   if (!form) return;
+
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     message.textContent = "";
@@ -65,6 +97,69 @@ function initLoginPage() {
       window.location.href = result.redirect || "/dashboard";
     } catch (error) {
       message.textContent = error.message;
+    }
+  });
+}
+
+function initFaceCheckinPage(mode) {
+  const faceFeed = document.getElementById("loginCameraFeed");
+  const faceButton = document.getElementById("faceLoginButton");
+  const faceStatus = document.getElementById("faceLoginStatus");
+  const resultBox = document.getElementById("faceCheckinResult");
+  if (!faceFeed || !faceButton || !faceStatus) return;
+
+  async function refreshLoginCameraStatus() {
+    try {
+      const camera = await apiRequest("/api/public/camera/status");
+      faceStatus.textContent = camera.message;
+      faceStatus.classList.toggle("success", Boolean(camera.available));
+      faceStatus.classList.remove("error");
+    } catch (error) {
+      faceStatus.textContent = error.message;
+      faceStatus.classList.add("error");
+    }
+  }
+
+  faceFeed.src = `${faceFeed.dataset.src}?t=${Date.now()}`;
+  refreshLoginCameraStatus();
+  const cameraStatusTimer = window.setInterval(refreshLoginCameraStatus, 2500);
+  window.addEventListener("pagehide", () => window.clearInterval(cameraStatusTimer), { once: true });
+
+  faceButton.addEventListener("click", async () => {
+    faceButton.disabled = true;
+    faceStatus.textContent = `正在识别人脸并记录${mode === "enter" ? "入馆" : "离馆"}，请保持正对摄像头...`;
+    faceStatus.classList.remove("success", "error");
+    if (resultBox) resultBox.hidden = true;
+    try {
+      const result = await apiRequest("/api/public/face-checkin", {
+        method: "POST",
+        body: JSON.stringify({ mode }),
+      });
+      faceStatus.textContent = result.message;
+      faceStatus.classList.add("success");
+      if (resultBox) {
+        resultBox.classList.remove("error");
+        resultBox.innerHTML = `
+          <strong>${escapeHtml(result.person_name)} ${mode === "enter" ? "入馆" : "离馆"}成功</strong>
+          <span>人员编号：${escapeHtml(result.person_id)}</span>
+          <span>${mode === "enter" ? "到馆时间" : "离馆时间"}：${escapeHtml(mode === "enter" ? result.record.enter_time : result.record.leave_time)}</span>
+          ${mode === "leave" ? `<span>本次停留：${escapeHtml(result.record.duration_text)}</span>` : ""}
+        `;
+        resultBox.hidden = false;
+      }
+      window.setTimeout(() => {
+        faceButton.disabled = false;
+        faceStatus.textContent = "打卡已记录，可以继续识别下一位人员。";
+      }, 1800);
+    } catch (error) {
+      faceStatus.textContent = error.message;
+      faceStatus.classList.add("error");
+      if (resultBox) {
+        resultBox.classList.add("error");
+        resultBox.textContent = error.message;
+        resultBox.hidden = false;
+      }
+      faceButton.disabled = false;
     }
   });
 }
@@ -150,20 +245,53 @@ async function loadSummary() {
   setText("averageStayText", summary.average_stay_text);
 }
 
+let dashboardInsideRecords = [];
+let dashboardInsideLoadedAt = Date.now();
+
+function formatDurationText(seconds) {
+  const safeSeconds = Math.max(0, Math.floor(Number(seconds) || 0));
+  const hours = Math.floor(safeSeconds / 3600);
+  const minutes = Math.floor((safeSeconds % 3600) / 60);
+  const secs = safeSeconds % 60;
+  if (hours) return `${hours}小时${minutes}分钟${secs}秒`;
+  if (minutes) return `${minutes}分钟${secs}秒`;
+  return `${secs}秒`;
+}
+
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    "\"": "&quot;",
+    "'": "&#039;",
+  })[character]);
+}
+
+function paintDashboardInside() {
+  const rows = document.getElementById("dashboardInsideRows");
+  if (!rows) return;
+  const elapsed = Math.max(0, Math.floor((Date.now() - dashboardInsideLoadedAt) / 1000));
+  rows.innerHTML = dashboardInsideRecords.length
+    ? dashboardInsideRecords.slice(0, 6).map((record) => `
+      <tr>
+        <td class="dashboard-person-cell">
+          <strong>${escapeHtml(record.person_name)}</strong>
+          <small>编号 ${escapeHtml(record.person_id)}</small>
+        </td>
+        <td class="dashboard-duration-cell">${formatDurationText(record.today_inside_seconds + elapsed)}</td>
+        <td class="dashboard-duration-cell total">${formatDurationText(record.inside_total_seconds + elapsed)}</td>
+      </tr>
+    `).join("")
+    : emptyRow(3, "当前没有在馆人员");
+}
+
 async function renderDashboardInside() {
   const rows = document.getElementById("dashboardInsideRows");
   if (!rows) return;
-  const records = await apiRequest("/api/inside");
-  rows.innerHTML = records.length
-    ? records.slice(0, 6).map((record) => `
-      <tr>
-        <td>第${record.sequence}个</td>
-        <td>${record.person_id}</td>
-        <td>${record.person_name}</td>
-        <td>${record.enter_time}</td>
-      </tr>
-    `).join("")
-    : emptyRow(4, "当前没有在馆人员");
+  dashboardInsideRecords = await apiRequest("/api/inside");
+  dashboardInsideLoadedAt = Date.now();
+  paintDashboardInside();
 }
 
 function renderChart(id, option) {
@@ -173,7 +301,7 @@ function renderChart(id, option) {
     node.innerHTML = '<div class="result-box">ECharts 未加载，请检查网络或静态资源。</div>';
     return;
   }
-  const chart = echarts.init(node);
+  const chart = echarts.getInstanceByDom(node) || echarts.init(node);
   chart.setOption(option);
   window.addEventListener("resize", () => chart.resize());
 }
@@ -252,6 +380,10 @@ async function renderDailyChart(id = "dailyChart") {
 
 async function initDashboardPage() {
   await Promise.all([loadSummary(), renderDashboardInside(), renderDailyChart()]);
+  window.setInterval(paintDashboardInside, 1000);
+  window.setInterval(loadSummary, 10000);
+  window.setInterval(renderDashboardInside, 30000);
+  window.setInterval(() => renderDailyChart(), 60000);
 }
 
 function initVideoPage() {

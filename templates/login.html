@@ -4,35 +4,84 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>登录 - 体育馆视频打卡管理系统</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v=7">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v=12">
 </head>
-<body class="login-page">
+<body class="login-page login-portal-page">
   {% include "_time_sky.html" %}
-  <main class="login-layout">
-    <section class="login-hero">
+  <main class="login-portal-layout">
+    <header class="login-portal-header">
       <p class="eyebrow">Gym Checkin System</p>
       <h1>体育馆视频打卡管理系统</h1>
-      <p>围绕人员入馆、离馆、在馆统计与视频打卡的场馆管理控制台。</p>
-    </section>
-    <form id="loginForm" class="login-panel">
-      <h2>系统登录</h2>
-      <label>
-        <span>账号</span>
-        <input name="username" autocomplete="username" placeholder="请输入账号" required>
-      </label>
-      <label>
-        <span>密码</span>
-        <input name="password" type="password" autocomplete="current-password" required>
-      </label>
-      <button type="submit">登录</button>
-      <p id="loginMessage" class="form-message"></p>
+      <p>中央大屏进入管理系统；入口设备记录入馆；出口设备记录离馆。</p>
+    </header>
+
+    <section class="login-panel system-login-card">
+      <div class="portal-card-heading">
+        <span class="portal-card-number">01</span>
+        <div>
+          <p>Management Console</p>
+          <h2>进入系统</h2>
+        </div>
+      </div>
+      <form id="loginForm" class="login-method-panel">
+        <label>
+          <span>账号</span>
+          <input name="username" autocomplete="username" placeholder="请输入账号" required>
+        </label>
+        <label>
+          <span>密码</span>
+          <input name="password" type="password" autocomplete="current-password" placeholder="请输入密码" required>
+        </label>
+        <button type="submit">进入系统</button>
+        <p id="loginMessage" class="form-message"></p>
+      </form>
       <div class="auth-links">
         <a href="{{ url_for('register_page') }}">注册新账号</a>
         <a href="{{ url_for('forgot_password_page') }}">忘记密码</a>
       </div>
-    </form>
+    </section>
+
+    <section class="face-entry-card enter-card">
+      <div class="portal-card-heading">
+        <span class="portal-card-number">02</span>
+        <div>
+          <p>Entrance Recognition</p>
+          <h2>进入场馆</h2>
+        </div>
+      </div>
+      <div class="face-entry-visual" aria-hidden="true">
+        <svg viewBox="0 0 160 160">
+          <path d="M49 22H30a8 8 0 0 0-8 8v19M111 22h19a8 8 0 0 1 8 8v19M49 138H30a8 8 0 0 1-8-8v-19M111 138h19a8 8 0 0 0 8-8v-19"/>
+          <path d="M56 69c0-18 10-30 24-30s24 12 24 30c0 17-10 31-24 31S56 86 56 69Z"/>
+          <path d="M44 126c5-17 18-26 36-26s31 9 36 26"/>
+        </svg>
+        <span></span>
+      </div>
+      <p>入口设备专用。识别人员后记录到馆时间，并加入当前在馆名单。</p>
+      <a class="face-entry-button" href="{{ url_for('face_checkin_page', mode='enter') }}">打开入馆扫脸</a>
+    </section>
+
+    <section class="face-entry-card exit-card">
+      <div class="portal-card-heading">
+        <span class="portal-card-number">03</span>
+        <div>
+          <p>Exit Recognition</p>
+          <h2>离开场馆</h2>
+        </div>
+      </div>
+      <div class="face-entry-visual" aria-hidden="true">
+        <svg viewBox="0 0 160 160">
+          <path d="M49 22H30a8 8 0 0 0-8 8v19M111 22h19a8 8 0 0 1 8 8v19M49 138H30a8 8 0 0 1-8-8v-19M111 138h19a8 8 0 0 0 8-8v-19"/>
+          <path d="M56 69c0-18 10-30 24-30s24 12 24 30c0 17-10 31-24 31S56 86 56 69Z"/>
+          <path d="M44 126c5-17 18-26 36-26s31 9 36 26"/>
+        </svg>
+        <span></span>
+      </div>
+      <p>出口设备专用。识别人员后记录离馆时间，并自动计算停留总时长。</p>
+      <a class="face-entry-button" href="{{ url_for('face_checkin_page', mode='leave') }}">打开离馆扫脸</a>
+    </section>
   </main>
-  <script src="{{ url_for('static', filename='js/app.js') }}?v=7"></script>
+  <script src="{{ url_for('static', filename='js/app.js') }}?v=12"></script>
   <script>initLoginPage();</script>
 </body>
 </html>

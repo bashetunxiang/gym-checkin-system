@@ -1,49 +1,56 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="stats-grid">
-  <article class="stat-card">
-    <span>今日到馆人数</span>
-    <strong id="todayEnterCount">0</strong>
-  </article>
-  <article class="stat-card">
-    <span>当前在馆人数</span>
-    <strong id="insideCount">0</strong>
-  </article>
-  <article class="stat-card">
-    <span>今日离馆人数</span>
-    <strong id="todayLeaveCount">0</strong>
-  </article>
-  <article class="stat-card">
-    <span>平均停留时间</span>
-    <strong id="averageStayText">0秒</strong>
-  </article>
-</div>
-
-<div class="two-column">
-  <section class="panel">
+<div class="dashboard-overview">
+  <section class="panel dashboard-inside-panel">
     <div class="panel-header">
-      <h2>近 7 日到馆趋势</h2>
-    </div>
-    <div id="dailyChart" class="chart"></div>
-  </section>
-  <section class="panel">
-    <div class="panel-header">
-      <h2>当前在馆人员</h2>
+      <div>
+        <span class="dashboard-panel-kicker">LIVE OCCUPANCY</span>
+        <h2>当前在馆人员</h2>
+      </div>
       <a href="{{ url_for('inside_page') }}">查看全部</a>
     </div>
-    <div class="table-wrap">
+    <p class="dashboard-panel-copy">实时查看人员姓名、今日在馆时间和本次在馆总时长。</p>
+    <div class="table-wrap dashboard-inside-table">
       <table>
         <thead>
           <tr>
-            <th>第几个进入场馆</th>
-            <th>人员编号</th>
             <th>姓名</th>
-            <th>进入时间</th>
+            <th>今日在馆时间</th>
+            <th>在馆总时长</th>
           </tr>
         </thead>
         <tbody id="dashboardInsideRows"></tbody>
       </table>
     </div>
+  </section>
+
+  <div class="stats-grid dashboard-stat-stack">
+    <article class="stat-card">
+      <span>今日到馆人数</span>
+      <strong id="todayEnterCount">0</strong>
+    </article>
+    <article class="stat-card">
+      <span>当前在馆人数</span>
+      <strong id="insideCount">0</strong>
+    </article>
+    <article class="stat-card">
+      <span>今日离馆人数</span>
+      <strong id="todayLeaveCount">0</strong>
+    </article>
+    <article class="stat-card">
+      <span>平均停留时间</span>
+      <strong id="averageStayText">0秒</strong>
+    </article>
+  </div>
+
+  <section class="panel dashboard-trend-panel">
+    <div class="panel-header">
+      <div>
+        <span class="dashboard-panel-kicker">WEEKLY TREND</span>
+        <h2>近 7 日到馆趋势</h2>
+      </div>
+    </div>
+    <div id="dailyChart" class="chart dashboard-trend-chart"></div>
   </section>
 </div>
 {% endblock %}

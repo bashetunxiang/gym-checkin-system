@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ page.title }} - 体育馆视频打卡管理系统</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v=12">
+</head>
+<body class="login-page face-recognition-page face-mode-{{ mode }}">
+  {% include "_time_sky.html" %}
+  <main class="face-recognition-layout">
+    <header class="face-recognition-header">
+      <div>
+        <p class="eyebrow">{{ page.eyebrow }}</p>
+        <h1>{{ page.title }}</h1>
+        <p>{{ page.instruction }}</p>
+      </div>
+      <a class="ghost-button" href="{{ url_for('login_page') }}">返回功能选择</a>
+    </header>
+
+    <section class="face-recognition-panel">
+      <div class="face-recognition-camera">
+        <img id="loginCameraFeed" data-src="{{ url_for('public_video_feed') }}" alt="{{ page.title }}摄像头实时画面">
+        <div class="face-recognition-guide" aria-hidden="true">
+          <span class="corner top-left"></span>
+          <span class="corner top-right"></span>
+          <span class="corner bottom-left"></span>
+          <span class="corner bottom-right"></span>
+          <div class="face-outline"></div>
+        </div>
+        <div class="scan-line" aria-hidden="true"></div>
+        <div class="camera-live-badge"><span></span> {{ page.action }}设备</div>
+      </div>
+
+      <aside class="face-recognition-control">
+        <span class="recognition-step">{{ page.action }}</span>
+        <h2>准备扫脸</h2>
+        <p id="faceLoginStatus" class="face-login-status">正在启动摄像头并加载 OpenCV...</p>
+        <ul>
+          <li>请摘下口罩、帽子等遮挡物</li>
+          <li>保持面部位于中央识别框</li>
+          <li>识别成功后自动写入{{ '到馆' if mode == 'enter' else '离馆' }}记录</li>
+        </ul>
+        <button id="faceLoginButton" type="button">{{ page.button }}</button>
+        <div id="faceCheckinResult" class="face-checkin-result" hidden></div>
+        <a class="face-password-link" href="{{ url_for('login_page') }}">返回三个功能入口</a>
+      </aside>
+    </section>
+  </main>
+  <script src="{{ url_for('static', filename='js/app.js') }}?v=12"></script>
+  <script>initFaceCheckinPage("{{ mode }}");</script>
+</body>
+</html>
